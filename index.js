@@ -6,7 +6,7 @@ const META = Symbol()
 
 // These are just exported for testing.
 export const notPromise = 'not a promise'
-export const notArray = "Promise didn't resolve to an array"
+export const promiseValue = "Promise must resolve to an action or array of actions"
 export const notActions = "not actions"
 export const writeFail = "write fail"
 export const singleArgument = 'This only supports single argument selectors'
@@ -38,8 +38,14 @@ export const loaderMiddleware = store => next => action => {
             }
 
             return loaderResult.then((actions) => {
+
+                // If it's an action, then it should store all items at once.
+                if (isPlainObject(actions) && typeof actions.type !== 'undefined') {
+                    actions = [ actions ]
+                }
+
                 if (!actions || !actions.forEach) {
-                    throw new Error(notArray)
+                    throw new Error(promiseValue)
                 }
 
                 actions.forEach((action, index) => {
@@ -48,13 +54,13 @@ export const loaderMiddleware = store => next => action => {
                     }
 
                     store.dispatch(action)
+                })
 
+                actions.forEach((action, index) => {
                     const key = toFetch[index]
                     if (!hasData(key)) {
                         throw new Error(writeFail)
                     }
-
-
                 })
 
                 return keys.map((key) => selector(key)(store.getState()) )
@@ -64,7 +70,10 @@ export const loaderMiddleware = store => next => action => {
 
     // Using an array with dataLoader doesn't seem to work, so just pass the 1st
     // parameter as the key here
-    return dataLoader.load(args[0])
+    const promise = dataLoader.load(args[0])
+    promise.catch((error) => console.error(error))
+
+    return promise
 }
 
 export function wrapSelector(selector, loader) {

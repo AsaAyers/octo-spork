@@ -3,7 +3,10 @@ import { wrapSelector, loaderMiddleware } from './index.js'
 import { createStore, applyMiddleware } from 'redux'
 import promiseMiddleware from 'redux-promise'
 
-import { notPromise, notArray, notActions, writeFail } from './index.js'
+import { notPromise, promiseValue, notActions, writeFail } from './index.js'
+
+const CREATE_TODO = 'CREATE_TODO'
+const BATCH_TODO = 'BATCH_TODO'
 
 function reducer(state = { todos: {} }, action) {
     if (action.type === CREATE_TODO) {
@@ -14,10 +17,18 @@ function reducer(state = { todos: {} }, action) {
         }
         return { ...state, todos }
     }
+    if (action.type === BATCH_TODO) {
+        // payload is an array of data, just convert it to individual actions
+        const actions = action.payload.map((data) => ({
+            type: CREATE_TODO,
+            payload: data
+        }))
+
+        return actions.reduce(reducer, state)
+    }
     return state
 }
 
-const CREATE_TODO = 'CREATE_TODO'
 
 const selectTodo = (id) => (state) => state.todos[id]
 
@@ -25,6 +36,13 @@ const createTodo = (id, description) => {
     return {
         type: CREATE_TODO,
         payload: { id, description, done: false }
+    }
+}
+
+const batchTodo = (items = []) => {
+    return {
+        type: BATCH_TODO,
+        payload: items
     }
 }
 
@@ -39,6 +57,18 @@ function fetchTodo(id) {
     return new Promise((resolve) => {
         setTimeout(() => {
             resolve(createTodo(id, `TODO: ${id}`))
+        }, 10)
+    })
+}
+
+function fetchTodos(ids) {
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            const data = ids.map(id => ({
+                id,
+                description: `TODO: ${id}`
+            }))
+            resolve(data)
         }, 10)
     })
 }
@@ -63,6 +93,25 @@ test('basic wrapSelector (2 items)', assert => {
     const requireTodo = wrapSelector(selectTodo, (keys) => {
         assert.deepEqual(keys, [ 1, 2 ])
         return Promise.all(keys.map(fetchTodo))
+    })
+
+    store.dispatch(requireTodo(1)).then((result) => {
+        assert.equal(result.description, 'TODO: 1')
+    })
+
+    store.dispatch(requireTodo(2)).then((result) => {
+        assert.equal(result.description, 'TODO: 2')
+    })
+})
+
+test("batch insert", assert => {
+    assert.plan(3)
+    const store = configureStore()
+
+    const requireTodo = wrapSelector(selectTodo, (keys) => {
+        assert.deepEqual(keys, [ 1, 2 ])
+        console.log('fetchTodos', keys)
+        return fetchTodos(keys).then((data) => batchTodo(data))
     })
 
     store.dispatch(requireTodo(1)).then((result) => {
@@ -163,7 +212,7 @@ test("error: Not actions", assert => {
     })
 
     store.dispatch(requireTodo(1)).catch((err) => {
-        assert.equal(err.message, notArray)
+        assert.equal(err.message, promiseValue)
     })
 })
 

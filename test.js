@@ -56,7 +56,7 @@ function configureStore() {
 function fetchTodo(id) {
     return new Promise((resolve) => {
         setTimeout(() => {
-            resolve(createTodo(id, `TODO: ${id}`))
+            resolve({id, description: `TODO: ${id}`})
         }, 10)
     })
 }
@@ -78,7 +78,13 @@ test('basic wrapSelector (1 item)', assert => {
     const store = configureStore()
 
     const requireTodo = wrapSelector(selectTodo, (keys) => {
-        return Promise.all(keys.map(fetchTodo))
+        const data = Promise.all(keys.map(fetchTodo))
+
+        return data.then((items) => {
+            return items.map(({id, description}) => {
+                return createTodo(id, description)
+            })
+        })
     })
 
     store.dispatch(requireTodo(1)).then((result) => {
@@ -92,7 +98,13 @@ test('basic wrapSelector (2 items)', assert => {
 
     const requireTodo = wrapSelector(selectTodo, (keys) => {
         assert.deepEqual(keys, [ 1, 2 ])
-        return Promise.all(keys.map(fetchTodo))
+        const data = Promise.all(keys.map(fetchTodo))
+
+        return data.then((items) => {
+            return items.map(({id, description}) => {
+                return createTodo(id, description)
+            })
+        })
     })
 
     store.dispatch(requireTodo(1)).then((result) => {
@@ -110,7 +122,6 @@ test("batch insert", assert => {
 
     const requireTodo = wrapSelector(selectTodo, (keys) => {
         assert.deepEqual(keys, [ 1, 2 ])
-        console.log('fetchTodos', keys)
         return fetchTodos(keys).then((data) => batchTodo(data))
     })
 
@@ -145,7 +156,13 @@ test("Only calls the API for missing keys", assert => {
 
     const requireTodo = wrapSelector(selectTodo, (keys) => {
         assert.deepEqual(keys, [ 2 ])
-        return Promise.all(keys.map(fetchTodo))
+        const data = Promise.all(keys.map(fetchTodo))
+
+        return data.then((items) => {
+            return items.map(({id, description}) => {
+                return createTodo(id, description)
+            })
+        })
     })
 
     store.dispatch(requireTodo(1))
@@ -160,7 +177,13 @@ test("same promise", assert => {
     const requireTodo = wrapSelector(selectTodo, (keys) => {
         called++
         assert.deepEqual(keys, [ 1 ])
-        return Promise.all(keys.map(fetchTodo))
+        const data = Promise.all(keys.map(fetchTodo))
+
+        return data.then((items) => {
+            return items.map(({id, description}) => {
+                return createTodo(id, description)
+            })
+        })
     })
 
     const p1 = store.dispatch(requireTodo(1))

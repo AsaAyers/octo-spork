@@ -61,7 +61,7 @@ test('basic wrapSelector (2 items)', assert => {
     const store = configureStore()
 
     const requireTodo = wrapSelector(selectTodo, (keys) => {
-        assert.deepEqual(keys, [ [1], [2] ])
+        assert.deepEqual(keys, [ 1, 2 ])
         return Promise.all(keys.map(fetchTodo))
     })
 
@@ -95,12 +95,34 @@ test("Only calls the API for missing keys", assert => {
     store.dispatch(createTodo(1, 'TODO: 1'))
 
     const requireTodo = wrapSelector(selectTodo, (keys) => {
-        assert.deepEqual(keys, [ [2] ])
+        assert.deepEqual(keys, [ 2 ])
         return Promise.all(keys.map(fetchTodo))
     })
 
     store.dispatch(requireTodo(1))
     store.dispatch(requireTodo(2))
+})
+
+test("same promise", assert => {
+    assert.plan(3)
+    const store = configureStore()
+
+    let called = 0
+    const requireTodo = wrapSelector(selectTodo, (keys) => {
+        called++
+        assert.deepEqual(keys, [ 1 ])
+        return Promise.all(keys.map(fetchTodo))
+    })
+
+    const p1 = store.dispatch(requireTodo(1))
+    const p2 = store.dispatch(requireTodo(1))
+
+    assert.equal(p1, p2, 'same promise?')
+
+    Promise.all([p1, p2]).then(() => {
+        assert.equal(called, 1)
+    })
+
 })
 
 test("error: reducer didn't write", assert => {

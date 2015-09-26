@@ -9,6 +9,7 @@ export const notPromise = 'not a promise'
 export const notArray = "Promise didn't resolve to an array"
 export const notActions = "not actions"
 export const writeFail = "write fail"
+export const singleArgument = 'This only supports single argument selectors'
 
 export const loaderMiddleware = store => next => action => {
     if (typeof action[META] === 'undefined') {
@@ -61,10 +62,9 @@ export const loaderMiddleware = store => next => action => {
         })
     }
 
-    return dataLoader.load(args).catch((err) => {
-        console.warn(err) // eslint-disable-line no-console
-        throw err
-    })
+    // Using an array with dataLoader doesn't seem to work, so just pass the 1st
+    // parameter as the key here
+    return dataLoader.load(args[0])
 }
 
 export function wrapSelector(selector, loader) {
@@ -76,6 +76,13 @@ export function wrapSelector(selector, loader) {
     }
 
     return (...args) => {
+        if (args.length != 1) {
+            // This is a limitation of the way I'm using dataloader. If there
+            // are multiple arguments then it has to become an array, and then
+            // each array is unique even if they contain the same value
+            throw new Error(singleArgument)
+        }
+
         return {
             [META]: {
                 loaderKey: LOADER_KEY,

@@ -4,12 +4,17 @@ octo-spork
 I don't know what to call this thing yet, but I want to make it public so I can gather feedback.
 
 
-Core concept
-------------
+Attempted explanation
+---------------------
+
+This helps generate Action Creators that call your API. They take the same parameters as your selector, and use the selector/store as cache.
 
 The selector pulls data from your local store. If the selector doesn't find any data, this makes a request to the API. Then it generates an action to update the store, so that when the selector runs again it will find the data.
 
 I built this on top of [facebook/dataloader](https://github.com/facebook/dataloader) so it would batch the keys.
+
+Usage
+-----
 
 ```js
 const requireTodo = wrapSelector(selectTodo, function loader(keys) {

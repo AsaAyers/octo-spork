@@ -8,6 +8,7 @@ const META = Symbol()
 export const notPromise = 'not a promise'
 export const notArray = "Promise didn't resolve to an array"
 export const notActions = "not actions"
+export const writeFail = "write fail"
 
 export const loaderMiddleware = store => next => action => {
     if (typeof action[META] === 'undefined') {
@@ -23,13 +24,19 @@ export const loaderMiddleware = store => next => action => {
         loaders[loaderKey].dataLoader = dataLoader = new DataLoader(keys => {
             const toFetch = keys.filter((key) => !hasData(key))
 
-            const tmp = loader(toFetch)
+            let loaderResult
 
-            if (typeof tmp.then !== 'function') {
-                return Promise.reject(new Error(notPromise))
+            if (toFetch.length > 0) {
+                loaderResult = loader(toFetch)
+
+                if (typeof loaderResult.then !== 'function') {
+                    return Promise.reject(new Error(notPromise))
+                }
+            } else {
+                loaderResult = Promise.resolve([])
             }
 
-            return tmp.then((actions) => {
+            return loaderResult.then((actions) => {
                 if (!actions || !actions.forEach) {
                     throw new Error(notArray)
                 }
@@ -40,6 +47,13 @@ export const loaderMiddleware = store => next => action => {
                     }
 
                     store.dispatch(action)
+
+                    const key = toFetch[index]
+                    if (!hasData(key)) {
+                        throw new Error(writeFail)
+                    }
+
+
                 })
 
                 return keys.map((key) => selector(key)(store.getState()) )

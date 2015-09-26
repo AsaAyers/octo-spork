@@ -3,7 +3,7 @@ import { wrapSelector, loaderMiddleware } from './index.js'
 import { createStore, applyMiddleware } from 'redux'
 import promiseMiddleware from 'redux-promise'
 
-import { notPromise, notArray, notActions } from './index.js'
+import { notPromise, notArray, notActions, writeFail } from './index.js'
 
 function reducer(state = { todos: {} }, action) {
     if (action.type === CREATE_TODO) {
@@ -21,10 +21,12 @@ const CREATE_TODO = 'CREATE_TODO'
 
 const selectTodo = (id) => (state) => state.todos[id]
 
-const createTodo = (id, description) => ({
-    type: CREATE_TODO,
-    payload: { id, description, done: false }
-})
+const createTodo = (id, description) => {
+    return {
+        type: CREATE_TODO,
+        payload: { id, description, done: false }
+    }
+}
 
 function configureStore() {
     return applyMiddleware(
@@ -59,7 +61,7 @@ test('basic wrapSelector (2 items)', assert => {
     const store = configureStore()
 
     const requireTodo = wrapSelector(selectTodo, (keys) => {
-        assert.equal(keys.length, 2, 'loader should batch requests')
+        assert.deepEqual(keys, [ [1], [2] ])
         return Promise.all(keys.map(fetchTodo))
     })
 
@@ -72,6 +74,50 @@ test('basic wrapSelector (2 items)', assert => {
     })
 })
 
+test("works when API request isn't needed", assert => {
+    assert.plan(1)
+    const store = configureStore()
+    store.dispatch(createTodo(1, 'TODO: 1'))
+
+    const requireTodo = wrapSelector(selectTodo, (keys) => {
+        // There is no need to call this when everything exists in the store.
+        assert.fail()
+    })
+
+    store.dispatch(requireTodo(1)).then((result) => {
+        assert.equal(result.description, 'TODO: 1')
+    })
+})
+
+test("Only calls the API for missing keys", assert => {
+    assert.plan(1)
+    const store = configureStore()
+    store.dispatch(createTodo(1, 'TODO: 1'))
+
+    const requireTodo = wrapSelector(selectTodo, (keys) => {
+        assert.deepEqual(keys, [ [2] ])
+        return Promise.all(keys.map(fetchTodo))
+    })
+
+    store.dispatch(requireTodo(1))
+    store.dispatch(requireTodo(2))
+})
+
+test("error: reducer didn't write", assert => {
+    assert.plan(1)
+    const store = configureStore()
+
+    const requireTodo = wrapSelector(selectTodo, (keys) => {
+        return Promise.all(keys.map((k) => ({
+            type: 'WRONG_TYPE',
+            payload: {}
+        })))
+    })
+
+    store.dispatch(requireTodo(1)).catch((err) => {
+        assert.equal(err.message, writeFail)
+    })
+})
 
 test("error: Not promise", assert => {
     assert.plan(1)
